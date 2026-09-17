@@ -61,8 +61,13 @@ jobs:
           echo "사용할 MPV 실행: $id"
 
       - name: mpv 내려받기
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
+          # 이 아티팩트는 archive:false 로 올라간 생 .7z 파일이다. 기본 동작은
+          # zip 으로 보고 풀려 드는 것이라 "Unable to download and extract"
+          # 로 실패한다. 업스트림의 publish_release 도 같은 이유로 이 옵션을
+          # 쓴다. 이 옵션은 v8 에 있어 버전도 함께 올렸다.
+          skip-decompress: true
           # 뒤를 [0-9] 로 막는 것이 중요하다. mpv-x86_64-* 로 두면
           # mpv-x86_64-v3-* 까지 걸린다. v3 는 AVX2 이상을 요구하는 최신 CPU
           # 전용 빌드라 구형 PC 에서 실행 자체가 안 된다 — 조용히 터진다.

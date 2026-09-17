@@ -63,9 +63,12 @@ jobs:
       - name: mpv 내려받기
         uses: actions/download-artifact@v6
         with:
-          # mpv-dev(라이브러리)·mpv-debug(디버그 심볼)는 받지 않는다.
-          # 재생기 본체만 필요하다.
-          pattern: mpv-x86_64-*
+          # 뒤를 [0-9] 로 막는 것이 중요하다. mpv-x86_64-* 로 두면
+          # mpv-x86_64-v3-* 까지 걸린다. v3 는 AVX2 이상을 요구하는 최신 CPU
+          # 전용 빌드라 구형 PC 에서 실행 자체가 안 된다 — 조용히 터진다.
+          # 버전이 날짜로 시작하므로 숫자를 강제하면 갈린다.
+          # mpv-dev(라이브러리)·mpv-debug(디버그 심볼)도 이 패턴에 안 걸린다.
+          pattern: mpv-x86_64-[0-9]*
           path: downloads
           merge-multiple: true
           run-id: ${{ steps.run.outputs.id }}
@@ -76,7 +79,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          archive=$(find downloads -name 'mpv-x86_64-*.7z' | head -n1)
+          archive=$(find downloads -name 'mpv-x86_64-[0-9]*.7z' | head -n1)
           if [ -z "$archive" ]; then
             echo "::error::mpv 압축파일을 찾지 못했습니다."
             find downloads -type f | head -20

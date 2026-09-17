@@ -13,3 +13,13 @@ dist/
 downloads/
 *.7z
 *.zip
+
+# 테스트용 영상. 자막은 작아서 함께 두지만 영상은 저장소에 넣지 않는다.
+# 만드는 법은 testdata/README.md 에 적어 둔다.
+testdata/*.mp4
+testdata/*.mkv
+
+# 영상 이름에 맞춰 복사한 자막. 원본(test-*.smi)만 두면 되고, 복사본은
+# README 대로 만들면 된다.
+testdata/superman-*.smi
+testdata/sintel-*.smi

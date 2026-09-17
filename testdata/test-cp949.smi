@@ -1,0 +1,24 @@
+<SAMI>
+<HEAD>
+<TITLE>SMI</TITLE>
+<STYLE TYPE="text/css">
+<!--
+P { margin-left:8pt; margin-right:8pt; text-align:center;
+    font-size:20pt; font-family:'맑은 고딕'; color:White; }
+.KRCC { Name:한국어; lang:ko-KR; SAMIType:CC; }
+-->
+</STYLE>
+</HEAD>
+<BODY>
+<SYNC Start=0><P Class=KRCC>SMI · CP949 (옛 한글 인코딩)
+<SYNC Start=4000><P Class=KRCC>&nbsp;
+<SYNC Start=4000><P Class=KRCC>한글이 안 깨지면 인코딩 처리가 정상입니다
+<SYNC Start=8000><P Class=KRCC>&nbsp;
+<SYNC Start=8000><P Class=KRCC>가나다라마바사 · 똠방각하 · 쀍쭜쫣
+<SYNC Start=12000><P Class=KRCC>&nbsp;
+<SYNC Start=12000><P Class=KRCC>특수문자: ￦ ± × ÷ ° ㈜ ℃ №
+<SYNC Start=16000><P Class=KRCC>&nbsp;
+<SYNC Start=16000><P Class=KRCC>긴 문장 줄바꿈 확인 ―<br>두 번째 줄입니다
+<SYNC Start=20000><P Class=KRCC>&nbsp;
+</BODY>
+</SAMI>

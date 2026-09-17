@@ -1,0 +1,268 @@
+name: 한국어판 포장
+
+# mpv 빌드 결과물(.7z)에 셰이더·UI·한국어 설정을 얹어 설치 프로그램으로 만든다.
+#
+# 원본 워크플로(mpv.yml·toolchain.yml·llvm.yml)는 건드리지 않는다. 그래야
+# `git pull upstream main` 으로 zhongfly 의 개선을 그대로 받아올 수 있다.
+# 이 파일과 packaging/ 폴더, korean-preset/ 폴더만 우리 것이다.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mpv_run_id:
+        description: "MPV 워크플로 실행 ID (비우면 가장 최근 성공분을 쓴다)"
+        required: false
+        type: string
+      release:
+        description: "릴리스로 발행 (끄면 Artifacts 에만 올라간다)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  actions: read
+
+env:
+  # 구성요소 버전을 고정한다. '최신'을 받아오면 어제 되던 빌드가 오늘
+  # 깨지고, 그때 무엇이 바뀌었는지 되짚을 수 없다.
+  ANIME4K_TAG: v4.0.1
+  UOSC_TAG: "5.13.0"
+  THUMBFAST_SHA: 0f711de3138c9bd6718209d819ac54022c23ded2
+
+jobs:
+  package:
+    name: 설치 프로그램 만들기
+    # Inno Setup 6.7.1 과 7zip 이 이미 깔려 있는 이미지라 추가 설치가 없다.
+    runs-on: windows-latest
+
+    steps:
+      - name: 저장소 가져오기
+        uses: actions/checkout@v5
+
+      # ── mpv 빌드 결과물 ───────────────────────────────────────────
+      - name: MPV 실행 ID 정하기
+        id: run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          id="${{ inputs.mpv_run_id }}"
+          if [ -z "$id" ]; then
+            id=$(gh run list --workflow=mpv.yml --status=success \
+                   --limit=1 --json databaseId --jq '.[0].databaseId')
+          fi
+          if [ -z "$id" ] || [ "$id" = "null" ]; then
+            echo "::error::성공한 MPV 빌드가 없습니다. 먼저 MPV 워크플로를 돌려주세요."
+            exit 1
+          fi
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+          echo "사용할 MPV 실행: $id"
+
+      - name: mpv 내려받기
+        uses: actions/download-artifact@v6
+        with:
+          # mpv-dev(라이브러리)·mpv-debug(디버그 심볼)는 받지 않는다.
+          # 재생기 본체만 필요하다.
+          pattern: mpv-x86_64-*
+          path: downloads
+          merge-multiple: true
+          run-id: ${{ steps.run.outputs.id }}
+          github-token: ${{ github.token }}
+
+      - name: 압축 풀기
+        id: mpv
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive=$(find downloads -name 'mpv-x86_64-*.7z' | head -n1)
+          if [ -z "$archive" ]; then
+            echo "::error::mpv 압축파일을 찾지 못했습니다."
+            find downloads -type f | head -20
+            exit 1
+          fi
+          echo "찾음: $archive"
+
+          # mpv-x86_64-20260917-git-abc1234.7z -> 20260917-git-abc1234
+          version=$(basename "$archive" .7z | sed 's/^mpv-x86_64-//')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          mkdir -p payload
+          7z x "$archive" -opayload -y > /dev/null
+          ls -la payload
+
+      # ── 구성요소 ─────────────────────────────────────────────────
+      - name: Anime4K 셰이더 (MIT)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p payload/portable_config/shaders
+          curl -sSfL -o a4k.zip \
+            "https://github.com/bloc97/Anime4K/releases/download/${ANIME4K_TAG}/Anime4K_v4.0.zip"
+          7z x a4k.zip -opayload/portable_config/shaders -y > /dev/null
+          echo "셰이더 $(ls payload/portable_config/shaders | wc -l) 개"
+
+      - name: uosc UI (LGPL-2.1)
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -sSfL -o uosc.zip \
+            "https://github.com/tomasklaen/uosc/releases/download/${UOSC_TAG}/uosc.zip"
+          7z x uosc.zip -opayload/portable_config -y > /dev/null
+
+          # 리눅스·맥용 도우미 실행파일은 윈도우 배포본에 필요 없다.
+          rm -f payload/portable_config/scripts/uosc/bin/ziggy-linux \
+                payload/portable_config/scripts/uosc/bin/ziggy-darwin
+
+      - name: thumbfast 썸네일 (MPL-2.0)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p payload/portable_config/scripts payload/portable_config/script-opts
+          base="https://raw.githubusercontent.com/po5/thumbfast/${THUMBFAST_SHA}"
+          curl -sSfL -o payload/portable_config/scripts/thumbfast.lua      "$base/thumbfast.lua"
+          curl -sSfL -o payload/portable_config/script-opts/thumbfast.conf "$base/thumbfast.conf"
+
+      # ── 우리 설정 ────────────────────────────────────────────────
+      - name: 한국어 설정 얹기
+        shell: bash
+        run: |
+          set -euo pipefail
+          # korean-preset/ 이 마지막에 복사되므로, 겹치는 파일은 우리 것이 이긴다.
+          cp -r korean-preset/. payload/portable_config/
+
+          echo "── portable_config ──"
+          find payload/portable_config -maxdepth 2 -not -path '*/uosc/*' | sort
+
+      # ── 라이선스 고지 ────────────────────────────────────────────
+      #
+      # 배포하는 이상 지켜야 하는 부분이다. 각 구성요소의 라이선스 원문을
+      # 함께 넣고, 무엇이 어떤 조건으로 들어갔는지 한 파일에 적는다.
+      - name: 라이선스 모으기
+        shell: bash
+        run: |
+          set -euo pipefail
+          L=payload/licenses
+          mkdir -p "$L"
+
+          curl -sSfL -o "$L/Anime4K-LICENSE.txt"  https://raw.githubusercontent.com/bloc97/Anime4K/master/LICENSE
+          curl -sSfL -o "$L/uosc-LICENSE.txt"     https://raw.githubusercontent.com/tomasklaen/uosc/main/LICENSE
+          curl -sSfL -o "$L/thumbfast-LICENSE.txt" "https://raw.githubusercontent.com/po5/thumbfast/${THUMBFAST_SHA}/LICENSE"
+          curl -sSfL -o "$L/mpv-LICENSE.txt"      https://raw.githubusercontent.com/mpv-player/mpv/master/LICENSE.GPL
+
+          cat > "$L/README.txt" <<EOF
+          이 프로그램은 오픈소스 소프트웨어를 모아 만든 것입니다.
+          만든 곳: DREAMURL (https://dreamurl.biz)
+
+          === 무엇이 들어 있나 ===
+
+          mpv (${{ steps.mpv.outputs.version }})
+            재생기 본체입니다. GPL 라이선스입니다.
+            https://mpv.io  /  https://github.com/mpv-player/mpv
+
+          Anime4K (${ANIME4K_TAG}) — MIT
+            애니메이션 화질 보정 셰이더입니다.
+            https://github.com/bloc97/Anime4K
+
+          uosc (${UOSC_TAG}) — LGPL-2.1
+            마우스로 쓰는 화면 조작 UI 입니다.
+            https://github.com/tomasklaen/uosc
+
+          thumbfast (${THUMBFAST_SHA}) — MPL-2.0
+            진행바에 미리보기 그림을 띄웁니다.
+            https://github.com/po5/thumbfast
+
+          === 소스코드 ===
+
+          mpv 는 GPL 이므로 이 설치본을 만든 소스와 빌드 과정을 모두
+          공개합니다. 아래에서 볼 수 있습니다.
+
+            https://github.com/${{ github.repository }}
+
+          이 설치본을 만든 빌드 기록:
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          재생기(mpv) 자체는 이 빌드로 만들어졌습니다:
+            https://github.com/${{ github.repository }}/actions/runs/${{ steps.run.outputs.id }}
+
+          === 한국어판이 원본과 다른 점 ===
+
+          프로그램 코드는 고치지 않았습니다. 설정과 구성만 더했습니다.
+
+            - 한국 자막(CP949) 이 깨지지 않게 설정
+            - .smi 자막 인식, 자막 폴더 자동 탐색
+            - 한글 글꼴·한국어 메뉴
+            - Anime4K 셰이더와 화질 프리셋 내장
+            - uosc / thumbfast 내장
+            - 설치 프로그램으로 포장
+
+          바뀐 내용 전부가 위 저장소의 korean-preset/ 과 packaging/ 에 있습니다.
+          EOF
+
+          echo "고지 파일 준비 완료"
+          ls -la "$L"
+
+      # ── 설치 프로그램 ────────────────────────────────────────────
+      - name: Inno Setup 으로 묶기
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.mpv.outputs.version }}"
+          New-Item -ItemType Directory -Force dist | Out-Null
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
+              "/DMpvVersion=$ver" packaging\mpv-korean.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup 실패 (코드 $LASTEXITCODE)" }
+          Get-ChildItem dist
+
+      - name: 체크섬
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum *.exe | tee sha256.txt
+
+      - name: Artifacts 로 올리기
+        uses: actions/upload-artifact@v5
+        with:
+          name: mpv-korean-setup
+          path: dist/*
+          retention-days: 30
+
+      # 제3자 액션을 쓰지 않고 gh CLI 로 만든다. 배포물을 만드는 파이프라인에
+      # 외부 의존을 하나라도 덜 두는 편이 낫다 — 이 빌드의 신뢰가 곧 상품이다.
+      # gh 는 러너에 기본 설치돼 있다.
+      - name: 릴리스 발행
+        if: ${{ inputs.release }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="setup-${{ steps.mpv.outputs.version }}"
+
+          cat > notes.md <<EOF
+          mpv 한국어판 설치 프로그램입니다.
+
+          | 구성요소 | 버전 |
+          |---|---|
+          | mpv | \`${{ steps.mpv.outputs.version }}\` |
+          | Anime4K | \`${ANIME4K_TAG}\` |
+          | uosc | \`${UOSC_TAG}\` |
+          | thumbfast | \`${THUMBFAST_SHA}\` |
+
+          설치한 뒤 재생 화면에서 **우클릭** 하면 메뉴가 나옵니다.
+
+          코드 서명 인증서를 붙이지 않은 빌드라 설치할 때 윈도우 경고가 뜹니다.
+          \`추가 정보\` → \`실행\` 을 눌러 주세요.
+
+          ---
+
+          이 파일이 어떤 소스에서 나왔는지 확인하실 수 있습니다.
+
+          - 포장 빌드: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          - mpv 빌드: https://github.com/${{ github.repository }}/actions/runs/${{ steps.run.outputs.id }}
+          EOF
+
+          gh release create "$tag" dist/* \
+            --title "mpv 한국어판 ${{ steps.mpv.outputs.version }}" \
+            --notes-file notes.md

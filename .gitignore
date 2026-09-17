@@ -1,0 +1,15 @@
+# 이 저장소는 공개다. 아래 것들이 실수로 커밋되면 즉시 유출이다.
+
+# 토큰·비밀
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# 빌드 산출물 (워크플로가 만드는 것들)
+payload/
+dist/
+downloads/
+*.7z
+*.zip

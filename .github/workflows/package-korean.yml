@@ -154,10 +154,25 @@ jobs:
           L=payload/licenses
           mkdir -p "$L"
 
-          curl -sSfL -o "$L/Anime4K-LICENSE.txt"  https://raw.githubusercontent.com/bloc97/Anime4K/master/LICENSE
-          curl -sSfL -o "$L/uosc-LICENSE.txt"     https://raw.githubusercontent.com/tomasklaen/uosc/main/LICENSE
-          curl -sSfL -o "$L/thumbfast-LICENSE.txt" "https://raw.githubusercontent.com/po5/thumbfast/${THUMBFAST_SHA}/LICENSE"
-          curl -sSfL -o "$L/mpv-LICENSE.txt"      https://raw.githubusercontent.com/mpv-player/mpv/master/LICENSE.GPL
+          # 어느 것이 404 인지 로그에 남긴다. curl 만 쓰면 `curl: (22) 404`
+          # 만 나와서 네 개 중 무엇이 없어졌는지 직접 찾아야 한다.
+          #
+          # 파일명이 저장소마다 다르다(LICENSE / LICENSE.LGPL / LICENSE.GPL).
+          # 업스트림이 이름을 바꾸면 여기서 멈추는데, 그 편이 라이선스 고지가
+          # 빠진 채로 배포되는 것보다 낫다.
+          fetch() {
+            local name="$1" url="$2"
+            if ! curl -sSfL -o "$L/$name" "$url"; then
+              echo "::error::라이선스를 받지 못했습니다: $name <- $url"
+              return 1
+            fi
+            echo "  OK $name"
+          }
+
+          fetch Anime4K-LICENSE.txt   "https://raw.githubusercontent.com/bloc97/Anime4K/master/LICENSE"
+          fetch uosc-LICENSE.txt      "https://raw.githubusercontent.com/tomasklaen/uosc/main/LICENSE.LGPL"
+          fetch thumbfast-LICENSE.txt "https://raw.githubusercontent.com/po5/thumbfast/${THUMBFAST_SHA}/LICENSE"
+          fetch mpv-LICENSE.txt       "https://raw.githubusercontent.com/mpv-player/mpv/master/LICENSE.GPL"
 
           cat > "$L/README.txt" <<EOF
           이 프로그램은 오픈소스 소프트웨어를 모아 만든 것입니다.

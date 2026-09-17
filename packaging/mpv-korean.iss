@@ -55,7 +55,9 @@ OutputBaseFilename=mpv-korean-setup-{#MpvVersion}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
-UninstallDisplayIcon={app}\mpv.exe
+; 제거 목록에 뜨는 아이콘. mpv.exe 의 내장 아이콘(= mpv 공식 로고)이 아니라
+; 우리 것을 쓴다. 공식 배포본으로 오해될 소지를 만들지 않는 편이 낫다.
+UninstallDisplayIcon={app}\mpv-korean.ico
 
 ; 아이콘을 넣으려면 packaging\mpv-korean.ico 를 두면 자동으로 쓰인다.
 ; 없으면 Inno 기본 아이콘으로 나간다 — 파일이 없을 때 빌드가 깨지지 않게
@@ -76,11 +78,16 @@ Name: "openwith";    Description: "동영상 파일 우클릭 → [연결 프로
 ; payload 폴더 통째로. mpv.exe 와 portable_config 가 여기 들어 있다.
 Source: "..\payload\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+; 바로가기가 참조할 아이콘. mpv.exe 안의 아이콘을 바꾸려면 실행 파일의
+; 리소스를 고쳐야 하는데, 배포물의 바이너리는 건드리지 않는다는 원칙에
+; 어긋난다. 아이콘 파일을 따로 두고 바로가기가 그것을 가리키게 한다.
+Source: "mpv-korean.ico"; DestDir: "{app}"; Flags: ignoreversion
+
 [Icons]
-Name: "{group}\{#AppName}";                  Filename: "{app}\mpv.exe"
-Name: "{group}\설정 폴더 열기";               Filename: "{app}\portable_config"
-Name: "{group}\{#AppName} 제거";              Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#AppName}";            Filename: "{app}\mpv.exe"; Tasks: desktopicon
+Name: "{group}\{#AppName}";      Filename: "{app}\mpv.exe"; IconFilename: "{app}\mpv-korean.ico"
+Name: "{group}\설정 폴더 열기";   Filename: "{app}\portable_config"
+Name: "{group}\{#AppName} 제거";  Filename: "{uninstallexe}"
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\mpv.exe"; IconFilename: "{app}\mpv-korean.ico"; Tasks: desktopicon
 
 [Registry]
 ; 파일 연결을 강제로 뺏지 않는다. 윈도우 10 이후로는 설치 프로그램이 기본
